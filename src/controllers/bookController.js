@@ -1,6 +1,8 @@
 const bookModel = require("../models/bookModel");
 const userModel = require("../models/userModel");
 const reviewModel = require("../models/reviewModel");
+const multer = require('multer');
+const aws = require('aws-sdk');
 
 const isValid = function (value) {
     if (typeof (value) === undefined || typeof (value) === null) { return false }
@@ -20,46 +22,91 @@ const isRightFormatReleasedAt = function (releasedAt) {
     return /((\d{4}[\/-])(\d{2}[\/-])(\d{2}))/.test(releasedAt)
 }
 
+aws.config.update(
+    {
+        accessKeyId: "AKIAY3L35MCRVFM24Q7U",
+        secretAccessKey: "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",
+        region: "ap-south-1"
+    }
+)
+
+let uploadFile = async (file) => {
+    return new Promise( function(resolve, reject) {
+        //this function will upload file to aws and return the link
+        let s3 = new aws.S3({ apiVersion: "2006-03-01" }) //we will be using s3 service of aws
+        //  await uploadFile(files[0])
+        var uploadParams = {
+            ACL: "public-read",
+            Bucket: "classroom-training-bucket", // HERE
+            Key: "abhishek/" + file.originalname, // HERE 
+            Body: file.buffer
+        }
+
+      s3.upload(uploadParams, function (err, data) {
+            if (err) { 
+                return reject({ "error": err }) 
+            }
+
+            console.log(data)
+            console.log(" file uploaded succesfully ")
+            return resolve(data.Location) // HERE
+          }
+        )
+
+    
+
+    }
+    )
+}
+
+
+
 const createBooks = async function (req, res) {
     try {
         const data = req.body;
-        const { title, excerpt, userId, ISBN, category, releasedAt } = data;
+        
+        const files = req.files;
 
 
         if (Object.keys(data) == 0) { return res.status(400).send({ status: false, message: 'No data provided' }) }
 
-        if (!isValid(title)) { return res.status(400).send({ status: false, message: 'Title is required' }) }
+        if (files.length == 0) { return res.status(400).send({ status: false, message: "No file found" }) }
 
-        let isUniquetitle = await bookModel.findOne({ title: title })
+        if (!isValid(data.title)) { return res.status(400).send({ status: false, message: 'Title is required' }) }
+
+        let isUniquetitle = await bookModel.findOne({ title: data.title })
         if (isUniquetitle) { return res.status(400).send({ status: false, message: 'Title already exist' }) }
 
-        if (!isValid(excerpt)) { return res.status(400).send({ status: false, message: 'Excerpt is required' }) }
+        if (!isValid(data.excerpt)) { return res.status(400).send({ status: false, message: 'Excerpt is required' }) }
 
-        if (!isValid(userId)) { return res.status(400).send({ status: false, message: 'User Id is required' }) }
+        if (!isValid(data.userId)) { return res.status(400).send({ status: false, message: 'User Id is required' }) }
 
-        if (!isValidObjectId(userId)) { return res.status(400).send({ status: false, message: 'Please provide a valid userId' }) }
+        if (!isValidObjectId(data.userId)) { return res.status(400).send({ status: false, message: 'Please provide a valid userId' }) }
 
-        let isValidid = await userModel.findOne({ _id: userId })
+        let isValidid = await userModel.findOne({ _id: data.userId })
         if (!isValidid) { return res.status(400).send({ status: false, message: 'There is no such id in database, Please provide a valid User Id' }) }
 
-        if (!isValid(ISBN)) { return res.status(400).send({ status: false, message: 'ISBN is required' }) }
+        if (!isValid(data.ISBN)) { return res.status(400).send({ status: false, message: 'ISBN is required' }) }
 
-        if (!isRightFormatISBN(ISBN)) { return res.status(400).send({ status: false, message: 'Please provide a valid ISBN' }) }
+        if (!isRightFormatISBN(data.ISBN)) { return res.status(400).send({ status: false, message: 'Please provide a valid ISBN' }) }
 
-        let isUniqueISBN = await bookModel.findOne({ ISBN: ISBN })
+        let isUniqueISBN = await bookModel.findOne({ ISBN: data.ISBN })
         if (isUniqueISBN) { return res.status(400).send({ status: false, message: 'ISBN already exist, please check your input' }) }
 
-        if (!isValid(category)) { return res.status(400).send({ status: false, message: 'Category is required' }) }
+        if (!isValid(data.category)) { return res.status(400).send({ status: false, message: 'Category is required' }) }
 
-        if (!isValid(releasedAt)) { return res.status(400).send({ status: false, message: 'Released date is required' }) }
+        if (!isValid(data.releasedAt)) { return res.status(400).send({ status: false, message: 'Released date is required' }) }
 
-        if (!isRightFormatReleasedAt(releasedAt)) { return res.status(400).send({ status: false, message: 'Please provide a valid released date in format YYYY/MM/DD ' }) }
+        if (!isRightFormatReleasedAt(data.releasedAt)) { return res.status(400).send({ status: false, message: 'Please provide a valid released date in format YYYY/MM/DD ' }) }
 
-        data.subcategory = data.subcategory.filter(x => x.trim());
-        if (data.subcategory.length == 0) { return res.status(400).send({ status: false, message: 'Subcategory is required' }) }
+        // data.subcategory = data.subcategory.filter(x => x.trim());
+        if (!isValid(data.subcategory)) { return res.status(400).send({ status: false, message: 'Subcategory is required' }) }
 
         //.Validation ends.//
 
+        const uploadedFileURL = await uploadFile(files[0])
+
+        data.bookCover= uploadedFileURL;
 
         const newBook = await bookModel.create(data);
 

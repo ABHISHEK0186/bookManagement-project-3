@@ -13,6 +13,7 @@ const bookSchema = new mongoose.Schema({
         required: 'Excerpt is required',
         trim: true
     },
+    bookCover: { type: String },
     userId: {
         type: ObjectId,
         ref: "bookManagementPrtoject_user",
@@ -23,12 +24,12 @@ const bookSchema = new mongoose.Schema({
         type: String,
         required: 'ISBN is required',
         unique: true,
-        trim:true
+        trim: true
     },
     category: {
         type: String,
         required: 'Category is required',
-        trim:true
+        trim: true
     },
     subcategory: {
         type: [String],
@@ -37,7 +38,7 @@ const bookSchema = new mongoose.Schema({
     reviews: {
         type: Number,
         default: 0,
-        trim:true
+        trim: true
     },
     deletedAt: { type: Date },
     isDeleted: {
